@@ -19,6 +19,46 @@ function facemelt_autoload_class($class_name) {
 }
 
 
+
+/**
+ * Implementation of hook_init().
+ */
+function facemelt_init() {
+  if (facemelt_is_cron() or facemelt_is_ajax_request())
+    return;
+  
+  facemelt_handle_absolute_first_debug_options();
+
+  // facebook initialization
+  $facebook = facemelt_fb();
+
+  facemelt_handle_pre_login_debug_options();
+
+  // automatically send user through fb login process if they aren't logged in or trying to register
+  if (!facemelt_debug_mode()) {
+    if (!facemelt_me()) {
+      //setcookie('fbs_' . facebook()->getAppId(), '', time() - 42000, '/', '.mydomainblahblah.com');
+
+      // if we're supposed to force users to connect to fb before viewing certain
+      // pages, let's do that now rather than later
+      if (facemelt_access__force_fb_connect_sometimes()) {
+          if (facemelt_access__failed_path_test() === TRUE) {
+            if (is_string(facemelt_access__forced_to_connect_message()))
+              drupal_set_message(facemelt_access__forced_to_connect_message());
+            if (is_string(facemelt_access__forced_to_connect_redirect_url()))
+              facemelt_goto(facemelt_access__forced_to_connect_redirect_url());
+          }
+        }
+      }
+    }
+
+    // handle the last batch of debug options
+    facemelt_handle_post_login_debug_options();
+  }
+}
+
+
+
 /**
  * Implementation of hook_permission().
  *
@@ -31,5 +71,22 @@ function facemelt_permission() {
       'restrict access' => TRUE,
     ),
   );
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function facemelt_menu() {
+  $items = array();
+  
+  $items['admin/facemelt/caches'] = array(
+    'title' => 'View Facemelt caches',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('facemelt_page_admin_view_caches'),
+    'access arguments' => array('use facemelt debug mode'),
+    'file' => 'facemelt.admin.inc',
+  );
+
+  return $items;
 }
 
