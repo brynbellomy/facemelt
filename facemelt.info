@@ -5,4 +5,4 @@ version = 7.x
 files[] = facemelt.module
 core = 7.x
 dependencies[] = ctools
-dependencies[] = 
+dependencies[] = cache_money
