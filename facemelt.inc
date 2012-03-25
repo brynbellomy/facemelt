@@ -78,6 +78,8 @@ function facemelt_facebook_app_secret() {
  * @author bryn austin bellomy
  */
 function facemelt_start_facebook($require_session = TRUE) {
+  global $cachemoney_prefix;
+
   facemelt_require_php_sdk();
   module_load_include('inc', 'facemelt', 'classes/facemelt_facebook');
   
@@ -108,14 +110,14 @@ function facemelt_start_facebook($require_session = TRUE) {
       
       // if the user isn't logged in to facebook, clear the entries in the SESSION cache that are facebook-dependent (my friends, etc)
       if (!$me) {
-        $_SESSION['fbook-dependent'] = array();
+        $_SESSION[$cachemoney_prefix] = array();
         unset($_SESSION['registered-email-address']);
       }
       return TRUE;
     } catch (FacebookApiException $e) {
       // if the user isn't logged in to facebook, clear the entries in the SESSION cache that are facebook-dependent (my friends, etc)
       if (!$me) {
-        $_SESSION['fbook-dependent'] = array();
+        $_SESSION[$cachemoney_prefix] = array();
         unset($_SESSION['registered-email-address']);
       }
       

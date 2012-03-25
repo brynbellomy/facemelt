@@ -2,6 +2,7 @@
 
 module_load_include('inc', 'facemelt');
 module_load_include('inc', 'facemelt', 'facemelt.little-elves');
+module_load_include('inc', 'facemelt', 'facemelt.debug');
 
 // register the class autoloader
 spl_autoload_register('facemelt_autoload_class');
