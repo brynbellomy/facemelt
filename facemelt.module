@@ -1,0 +1,34 @@
+<?php
+
+module_load_include('inc', 'facemelt');
+module_load_include('inc', 'facemelt', 'facemelt.little-elves');
+
+// register the class autoloader
+spl_autoload_register('facemelt_autoload_class');
+
+/**
+ * PHP 5 class autoloader.
+ *
+ * @author bryn austin bellomy
+ */
+function facemelt_autoload_class($class_name) {
+  if (strpos($class_name, 'facemelt_') === 0) {
+    module_load_include('inc', 'facemelt', 'classes/' . $class_name);
+  }
+}
+
+
+/**
+ * Implementation of hook_permission().
+ *
+ * @author bryn austin bellomy
+ */
+function facemelt_permission() {
+  return array(
+    'use facemelt debug mode' => array(
+      'title' => t('Use Facemelt debug mode'),
+      'restrict access' => TRUE,
+    ),
+  );
+}
+
