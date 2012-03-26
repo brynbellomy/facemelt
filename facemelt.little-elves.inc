@@ -1,23 +1,6 @@
 <?php
 
 /**
- * facemelt_debug_mode()
- *
- * Clean way of letting various parts of the code check
- * whether they can display debug messages.
- *
- * @return void
- * @author bryn austin bellomy
- */
-function facemelt_debug_mode($active = FALSE) {
-  if (user_access('use facemelt debug mode') &&
-      ((!$active || $_GET['debug'] == 1) || variable_get('facemelt_debug_mode', FALSE) == TRUE)) {
-    return TRUE;
-  }
-  return FALSE;
-}
-
-/**
  * facemelt_dsm()
  *
  * dsm() wrapper to keep us from depending on devel and to encapsulate some

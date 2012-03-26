@@ -1,0 +1,136 @@
+<?php
+
+/**
+ *
+ */
+function facemelt_opengraph_init() {
+  if ($_GET['test-publish']) {
+    $node = node_load((int)$_GET['test-publish']);
+    facemelt_opengraph_publish('ask', 'question', $node);
+  }
+}
+
+/**
+ * Hook caller for acquiring a mapping of graph object types to the actions that
+ * can be performed with each.
+ *
+ * Example of hook return value:
+ * return array(
+ *   'question' => array('ask'),
+ *   'answer' => array('post'),
+ * );
+ * 
+ *
+ */
+function facemelt_opengraph_get_object_to_action_map() {
+  return module_invoke_all('facemelt_opengraph_objects_to_actions');
+}
+
+/**
+ * Hook caller for acquiring a mapping of all publishable node types to their
+ * associated Facebook Open Graph types .
+ *
+ * Example of hook return value:
+ * return array(
+ *   'question' => array('question'),
+ *   'answer' => array('answer'),
+ * );
+ */
+function facemelt_opengraph_get_publishable_node_types() {
+  return module_invoke_all('facemelt_opengraph_publishable_node_types');
+}
+
+/**
+ * Determine if a node is publishable as a given object
+ * type with a certain action.
+ */
+function facemelt_opengraph_node_is_publishable($action, $object_type, $node) {
+  $publishable_types = facemelt_opengraph_get_publishable_node_types();
+  $obj_to_action_map = facemelt_opengraph_get_object_to_action_map();
+  
+  $node_type_okay = in_array($node->type, array_keys($publishable_types));
+  $node_as_obj_okay = in_array($object_type, $publishable_types[$node->type]);
+  $obj_to_act_okay = in_array($action, $obj_to_action_map[$object_type]);
+
+  return ($node_type_okay && $node_as_obj_okay && $obj_to_act_okay);
+}
+
+/**
+ * Publish a node as a given object type with a certain action.
+ */
+function facemelt_opengraph_publish($action, $object_type, $node) {
+  if (facemelt_opengraph_node_is_publishable($action, $object_type, $node)) {
+    dsm($node, 'publishing node');
+    $entity_uri = entity_uri('node', $node);
+    $object_uri = url($entity_uri['path'], array('absolute' => TRUE));
+    dsm(array('ent' => $entity_uri, 'obj' => $object_uri), 'uris');
+    $object_type = $node->type;
+    $namespace = facemelt_opengraph_app_namespace();
+    $action = 'ask';
+    $req = "/me/{$namespace}:{$action}?{$object_type}={$object_uri}";
+    dsm(array('ns' => $namespace, 'act' => $action, 'typ' => $object_type, 'uri' => $object_uri, 'req' => $req));
+    $facebook = facemelt_fb();
+    $response = $facebook->api($req, 'POST');
+    //facemelt_fb_graph_request("/me/$namespace:$action?$object_type=$object_uri", 'POST', TRUE);
+    dsm($response, 'graph request response');
+  }
+  else
+    return FALSE;
+}
+
+function facemelt_opengraph_node_insert($node) {
+  $types = facemelt_opengraph_get_graph_object_node_types();
+  if (in_array($node->type, $types)) {
+    // @@TODO: publish the graph object
+  }
+}
+
+
+function facemelt_opengraph_app_namespace() {
+  return variable_get('facemelt_opengraph_app_namespace', NULL);
+}
+
+/**
+ * Implementation of hook_theme().
+ */
+function facemelt_opengraph_theme($existing, $type, $theme, $path) {
+  $hooks = array(
+    'facemelt_opengraph_metadata_object' => array(
+      'variables' => array('node' => NULL, 'app_id' => NULL, 'type' => NULL, 'url' => NULL,
+                           'title' => NULL, 'description' => NULL, 'image' => NULL),
+      'template' => 'facemelt-opengraph-metadata-object',
+    ),
+  );
+  return $hooks;
+}
+
+
+function template_process_facemelt_opengraph_metadata_object(&$vars, $hook) {
+  $vars['app_id'] = ($vars['app_id'] ? $vars['app_id'] : facemelt_facebook_app_id());
+  $vars['namespace'] = ($vars['namespace'] ? $vars['namespace'] : facemelt_opengraph_app_namespace());
+
+  $fn_default = function($property) {
+    if ($property == 'image') return 'http://fbwerks.com:8000/zhen/cookie.jpg';
+    else return '';
+  };
+
+  // default setter (returns empty string)
+  $fn = function($property) { return ''; };
+
+  // smart setter (returns properties from provided node)
+  if (is_object($vars['node'])) {
+    $node = $vars['node'];
+    $fn = function($property) use ($node, $fn_default) {
+      if ($property == 'url') {
+        $uri = entity_uri('node', $node);
+        return url($uri['path'], array('absolute' => TRUE));
+      }
+      else return (isset($node->$property) ? $node->$property : $fn_default($property));
+    };
+  }
+
+  $object_properties = array('type', 'title', 'url', 'description', 'image');
+  foreach ($object_properties as $prop)
+    $vars[$prop] = $fn($prop);
+}
+

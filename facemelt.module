@@ -1,8 +1,4 @@
-<?php
-
-module_load_include('inc', 'facemelt');
-module_load_include('inc', 'facemelt', 'facemelt.little-elves');
-module_load_include('inc', 'facemelt', 'facemelt.debug');
+<?php 
 
 // register the class autoloader
 spl_autoload_register('facemelt_autoload_class');
@@ -14,39 +10,84 @@ spl_autoload_register('facemelt_autoload_class');
  */
 function facemelt_autoload_class($class_name) {
   if (strpos($class_name, 'facemelt_') === 0) {
-    module_load_include('inc', 'facemelt', 'classes/' . $class_name);
+    require_once DRUPAL_ROOT . '/sites/all/modules/user/facemelt/classes/' . $class_name . '.inc';
+    //require drupal_get_path('module', 'facemelt') . '/classes/' . $class_name . '.inc';
   }
+  else if (strpos($class_name, 'Facebook') === 0)
+    require_once DRUPAL_ROOT . '/sites/all/modules/user/facemelt/facebook-php-sdk/src/facebook.php';
 }
-
-
 
 /**
  * Implementation of hook_init().
+ *
+ * @author bryn austin bellomy
  */
 function facemelt_init() {
-  if (facemelt_is_cron() or facemelt_is_ajax_request())
+  module_load_include('inc', 'facemelt');
+  module_load_include('inc', 'facemelt', 'facemelt.little-elves');
+  module_load_include('inc', 'facemelt', 'facemelt.admin');
+  module_load_include('inc', 'facemelt', 'facemelt.debug');
+  module_load_include('inc', 'facemelt', 'facemelt.settings');
+  module_load_include('inc', 'facemelt', 'facemelt.blocks');
+
+  if (facemelt_is_cron() /*or facemelt_is_ajax_request()*/)
     return;
+
+  // check if the fboauth module is enabled so that we can integrate with it
+  $fboauth_enabled = facemelt_fboauth_enabled();
+
+  if (isset($_REQUEST['code'])) {
+    // if fboauth is enabled and there's an incoming access code from facebook
+    // on the current page request, forestall the rest of this module's facebook
+    // initialization so fboauth can take care of authorizing the user and
+    // starting a session
+    if ($fboauth_enabled) {
+      /*module_load_include('inc', 'fboauth', 'includes/fboauth');
+      $action = explode('/', $_GET['q']);
+      $action = $action[1];
+      fboauth_action_page($action);
+      return;*/
+    }
+
+    // if fboauth is not enabled, the facemelt_fb() function below will receive
+    // the access code and will attempt to create an authenticated session with it
+  }
   
   facemelt_handle_absolute_first_debug_options();
 
-  // facebook initialization
+  // try to initialize the facebook session.
+  // don't require an authenticated session if the fboauth module is
+  // enabled -- it should create it for us
   $facebook = facemelt_fb();
 
   facemelt_handle_pre_login_debug_options();
 
-  // automatically send user through fb login process if they aren't logged in or trying to register
+  $me = facemelt_me();
+  
+  // piggyback onto fboauth's automatic registering of user accounts if possible.
+  // we probably can't rely on fboauth to do this for us (at least not without
+  // invoking its functions manually) because we're probably not using its endpoints
+  // and its exact user flow
+  if (!!$me and $facebook->getAccessToken()) {
+    global $user;
+    if ($user->uid <= 0)
+      facemelt_handle_incoming_fb_user();
+  }
+
   if (!facemelt_debug_mode()) {
-    if (!facemelt_me()) {
+    if (!$me) {
       //setcookie('fbs_' . facebook()->getAppId(), '', time() - 42000, '/', '.mydomainblahblah.com');
 
-      // if we're supposed to force users to connect to fb before viewing certain
-      // pages, let's do that now rather than later
-      if (facemelt_access__force_fb_connect_sometimes()) {
-        if (facemelt_access__failed_path_test() === TRUE) {
-          if (is_string(facemelt_access__forced_to_connect_message()))
-            drupal_set_message(facemelt_access__forced_to_connect_message());
-          if (is_string(facemelt_access__forced_to_connect_redirect_url()))
-            facemelt_goto(facemelt_access__forced_to_connect_redirect_url());
+      // if we're supposed to force users to connect to fb before viewing the
+      // current page, let's do that now
+      if (facemelt_fbconnect_some_pages_require_connect()) {
+        if (facemelt_fbconnect_must_be_connected_at_current_path() === TRUE) {
+
+          if (is_string(facemelt_fbconnect_connect_required_message()))
+            drupal_set_message(facemelt_fbconnect_connect_required_message());
+
+          if (is_string(facemelt_fbconnect_connect_required_redirect_path()))
+            facemelt_goto(facemelt_fbconnect_connect_required_redirect_path());
         }
       }
     }
@@ -54,8 +95,49 @@ function facemelt_init() {
 
   // handle the last batch of debug options
   facemelt_handle_post_login_debug_options();
+
+  // add js
+  facemelt_add_common_js();
 }
 
+/**
+ * Add javascript that's plausibly needed on every page load.
+ */
+function facemelt_add_common_js() {
+  global $user;
+  $app_id = facemelt_facebook_app_id();
+  $channel_url = facemelt_fb_channel_url();
+  $inline_js =
+    "var Facemelt = Facemelt || {};" .
+    "Facemelt.userLoggedIn = " . ($user->uid <= 0 ? "false" : "true") . ";" .
+    "Facemelt.facebookAppId = '$app_id';" .
+    "Facemelt.facebookChannelURL = '$channel_url';";
+  drupal_add_js($inline_js, 'inline');
+  drupal_add_js(drupal_get_path('module', 'facemelt') . '/js/facemelt.js');
+  drupal_add_js(drupal_get_path('module', 'facemelt') . '/js/facemelt.behaviors.js');
+
+  $opts = array('response_type' => 'code');
+  drupal_add_js(facemelt_oauth_dialog_settings_javascript('connect', $opts), 'inline');
+}
+
+
+
+
+/**
+ * Implementation of hook_facemelt_oauth_scope().
+ *
+ * @author bryn austin bellomy
+ */
+function facemelt_facemelt_oauth_scope() {
+  // load up a bunch of permissions via the fboauth module
+  $permissions = array();
+  $actions = module_invoke_all('fboauth_actions');
+  foreach ($actions as $name => $action) {
+    if (is_array($action['permissions']))
+      $permissions[$name] = $action['permissions'];
+  }
+  return $permissions;
+}
 
 
 /**
@@ -74,6 +156,8 @@ function facemelt_permission() {
 
 /**
  * Implementation of hook_menu().
+ *
+ * @author bryn austin bellomy
  */
 function facemelt_menu() {
   $items = array();
@@ -86,6 +170,56 @@ function facemelt_menu() {
     'file' => 'facemelt.admin.inc',
   );
 
+  $items['facemelt/connect/close-popup'] = array(
+    'title' => t(''),
+    'page callback' => 'facemelt_fbconnect_done_close_popup',
+    'page arguments' => array(),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
+  // facemelt_fbconnect_receive_authenticated_session_path
+  $items['facemelt/connect/login'] = array(
+    'page callback' => 'facemelt_fbconnect_page_receive_authenticated_session',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+  
+  $items['facemelt/channel'] = array(
+    'title' => '',
+    'page callback' => 'facemelt_page_channel',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK
+  );
+
   return $items;
 }
+
+/**
+ * Menu callback to close FB login popup window after auth is done.
+ */
+function facemelt_fbconnect_done_close_popup() {
+  return
+    '<script>' .
+    '  window.close(); alert("still alive!");' .
+    '  window.location.replace("/facemelt/connect/login");' .
+    '</script>';
+}
+
+function facemelt_fbconnect_page_receive_authenticated_session() {
+  return 'Authenticating...';
+}
+
+/**
+ * Menu callback to enable cross-domain Javascript communication for FB Connect.
+ */
+function facemelt_page_channel() {
+  $cache_expire = 60*60*24*365;
+  header("Pragma: public");
+  header("Cache-Control: max-age=".$cache_expire);
+  header('Expires: ' . gmdate('D, d M Y H:i:s', time()+$cache_expire) . ' GMT');
+  echo '<script src="//connect.facebook.net/en_US/all.js"></script>';
+}
+
+
 

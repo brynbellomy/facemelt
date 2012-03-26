@@ -1,0 +1,7 @@
+; $Id$ 
+name = Facemelt: Facebook Open Graph
+description = X-tremely better Facebook Open Graph integration
+version = 7.x
+files[] = facemelt_opengraph.module
+core = 7.x
+dependencies[] = facemelt

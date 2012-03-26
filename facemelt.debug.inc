@@ -1,5 +1,22 @@
 <?php
 
+/**
+ * facemelt_debug_mode()
+ *
+ * Clean way of letting various parts of the code check
+ * whether they can display debug messages.
+ *
+ * @return void
+ * @author bryn austin bellomy
+ */
+function facemelt_debug_mode($active = FALSE) {
+  if (user_access('use facemelt debug mode') &&
+      ((!$active || $_GET['debug'] == 1) || variable_get('facemelt_debug_mode', FALSE) == TRUE)) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
 
 /**
  * Handle debug options that can be processed before Facebook is initialized.
@@ -15,7 +32,7 @@ function facemelt_handle_absolute_first_debug_options() {
       variable_set('facemelt_debug_mode', FALSE);
   
     if (facemelt_debug_mode())
-      dsm(t('Debug mode is currently active.  To disable, add "?debug-mode=0" to any URL.'));
+      dsm(t('The Facemelt module\'s debug mode is currently active.  To disable, add "?debug-mode=0" to any URL.'));
   }
 }
 
@@ -62,4 +79,52 @@ function facemelt_handle_post_login_debug_options() {
   }
 }
 
+/**
+ * Create a Facebook test user.
+ *
+ * @param bool $installed 
+ *   Whether the user should be created having already authorized the app.
+ * @param string $perms
+ *   If $installed is TRUE, $perms should be used to list the permissions
+ *   that the test user has granted to the app.
+ * @return Array containing Facebook API response message.  This will
+ *   contain the test user's unique login URL and some other data.
+ * @author bryn austin bellomy
+ */
+function facemelt_fb_create_test_user($installed, $perms = NULL) {
+  $facebook = facemelt_fb();
+  $appId = $facebook->getAppId();
+  if (!($app_access_token = facemelt_fb_get_app_access_token())) {
+    return FALSE;
+  }
+  $params = array(
+    'installed' => $installed,
+    'access_token' => $app_access_token,
+  );
+  if ($perms) {
+    $params['permissions'] = $perms;
+  }
+  $response = $facebook->api("/$appId/accounts/test-users", 'POST', $params);
+  return $response;
+}
+
+/**
+ * List all of the app's Facebook test users.
+ *
+ * @return void
+ * @author bryn austin bellomy
+ */
+function facemelt_fb_show_test_users() {
+  $facebook = facemelt_fb();
+  $appId = $facebook->getAppId();
+  if (!($app_access_token = facemelt_fb_get_app_access_token())) {
+    return FALSE;
+  }
+
+  $params = array(
+    'access_token' => $app_access_token,
+  );
+  $response = facemelt_fb_graph_request("/$appId/accounts/test-users", 'GET', $params);
+  return $response;
+}
 

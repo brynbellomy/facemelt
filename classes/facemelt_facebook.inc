@@ -1,6 +1,5 @@
 <?php
 
-
 class facemelt_facebook extends Facebook {
   
   public function restserver($params, $json_decode = TRUE, $use_access_token = TRUE) {

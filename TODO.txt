@@ -1,0 +1,1 @@
+- Still can't figure out how to get the login flow working with the simple FB Login Social Plugin

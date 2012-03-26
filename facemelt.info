@@ -4,5 +4,5 @@ description = X-tremely better Facebook PHP SDK
 version = 7.x
 files[] = facemelt.module
 core = 7.x
-dependencies[] = ctools
 dependencies[] = cache_money
+dependencies[] = fboauth
