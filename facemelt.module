@@ -42,19 +42,18 @@ function facemelt_init() {
       // if we're supposed to force users to connect to fb before viewing certain
       // pages, let's do that now rather than later
       if (facemelt_access__force_fb_connect_sometimes()) {
-          if (facemelt_access__failed_path_test() === TRUE) {
-            if (is_string(facemelt_access__forced_to_connect_message()))
-              drupal_set_message(facemelt_access__forced_to_connect_message());
-            if (is_string(facemelt_access__forced_to_connect_redirect_url()))
-              facemelt_goto(facemelt_access__forced_to_connect_redirect_url());
-          }
+        if (facemelt_access__failed_path_test() === TRUE) {
+          if (is_string(facemelt_access__forced_to_connect_message()))
+            drupal_set_message(facemelt_access__forced_to_connect_message());
+          if (is_string(facemelt_access__forced_to_connect_redirect_url()))
+            facemelt_goto(facemelt_access__forced_to_connect_redirect_url());
         }
       }
     }
-
-    // handle the last batch of debug options
-    facemelt_handle_post_login_debug_options();
   }
+
+  // handle the last batch of debug options
+  facemelt_handle_post_login_debug_options();
 }
 
 
