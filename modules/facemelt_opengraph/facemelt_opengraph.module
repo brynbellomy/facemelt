@@ -1,7 +1,7 @@
 <?php
 
 /**
- *
+ * Implementation of hook_init().
  */
 function facemelt_opengraph_init() {
   if ($_GET['test-publish']) {
@@ -60,26 +60,20 @@ function facemelt_opengraph_node_is_publishable($action, $object_type, $node) {
  */
 function facemelt_opengraph_publish($action, $object_type, $node) {
   if (facemelt_opengraph_node_is_publishable($action, $object_type, $node)) {
-    dsm($node, 'publishing node');
     $entity_uri = entity_uri('node', $node);
     $object_uri = url($entity_uri['path'], array('absolute' => TRUE));
-    dsm(array('ent' => $entity_uri, 'obj' => $object_uri), 'uris');
     $object_type = $node->type;
     $namespace = facemelt_opengraph_app_namespace();
     $action = 'ask';
     $req = "/me/{$namespace}:{$action}?{$object_type}={$object_uri}";
-    dsm(array('ns' => $namespace, 'act' => $action, 'typ' => $object_type, 'uri' => $object_uri, 'req' => $req));
-    $facebook = facemelt_fb();
-    $response = $facebook->api($req, 'POST');
-    //facemelt_fb_graph_request("/me/$namespace:$action?$object_type=$object_uri", 'POST', TRUE);
-    dsm($response, 'graph request response');
+    $response = facemelt_fb()->api($req, 'POST');
   }
   else
     return FALSE;
 }
 
 function facemelt_opengraph_node_insert($node) {
-  $types = facemelt_opengraph_get_graph_object_node_types();
+  $types = facemelt_opengraph_get_publishable_node_types();
   if (in_array($node->type, $types)) {
     // @@TODO: publish the graph object
   }
