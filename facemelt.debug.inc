@@ -31,8 +31,8 @@ function facemelt_handle_absolute_first_debug_options() {
     else if ($_GET['debug-mode'] === '0')
       variable_set('facemelt_debug_mode', FALSE);
   
-    if (facemelt_debug_mode())
-      dsm(t('The Facemelt module\'s debug mode is currently active.  To disable, add "?debug-mode=0" to any URL.'));
+    //if (facemelt_debug_mode())
+      //dsm(t('The Facemelt module\'s debug mode is currently active.  To disable, add "?debug-mode=0" to any URL.'));
   }
 }
 
