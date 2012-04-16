@@ -47,7 +47,7 @@
               $('input[name=form_build_id]', $form).remove();
 
               // move the contents of any tinyMCE elements into their real form elements
-              if (typeof Facemelt.FBConnect.tinymce_elements != 'undefined') {
+              if (!!Facemelt.FBConnect && typeof Facemelt.FBConnect.tinymce_elements != 'undefined') {
                 for (var i in Facemelt.FBConnect.tinymce_elements) {
                   var id = Facemelt.FBConnect.tinymce_elements[i];
                   var tinymceText = tinymce.get(id).getContent();
